@@ -25,7 +25,7 @@ cv2.setMouseCallback('show3d', onmouse)
 dll = np.ctypeslib.load_library('render_balls_so', '.')
 
 
-def showpoints(xyz, c0=None, c1=None, c2=None, waittime=0, showrot=False, magnifyBlue=0, freezerot=False, background=(0, 0, 0), normalizecolor=True, ballradius=10):
+def showpoints(xyz, c0=None, c1=None, c2=None, waittime=0, showrot=False, magnify_blue=0, freezerot=False, background=(0, 0, 0), normalizecolor=True, ballradius=10):
     global showsz, mousex, mousey, zoom, changed
     xyz = xyz - xyz.mean(axis=0)
     radius = ((xyz ** 2).sum(axis=-1) ** 0.5).max()
@@ -83,12 +83,12 @@ def showpoints(xyz, c0=None, c1=None, c2=None, waittime=0, showrot=False, magnif
             ct.c_int(ballradius)
         )
 
-        if magnifyBlue > 0:
+        if magnify_blue > 0:
             show[:, :, 0] = np.maximum(show[:, :, 0], np.roll(show[:, :, 0], 1, axis=0))
-            if magnifyBlue >= 2:
+            if magnify_blue >= 2:
                 show[:, :, 0] = np.maximum(show[:, :, 0], np.roll(show[:, :, 0], -1, axis=0))
             show[:, :, 0] = np.maximum(show[:, :, 0], np.roll(show[:, :, 0], 1, axis=1))
-            if magnifyBlue >= 2:
+            if magnify_blue >= 2:
                 show[:, :, 0] = np.maximum(show[:, :, 0], np.roll(show[:, :, 0], -1, axis=1))
         if showrot:
             cv2.putText(show, 'xangle %d' % (int(xangle / np.pi * 180)), (30, showsz - 30), 0, 0.5, cv2.cv.CV_RGB(255, 0, 0))

@@ -1,4 +1,4 @@
-from depthestimate import show3d_balls as show3d
+from . import show3d_balls as show3d
 import numpy as np
 import cv2
 import pickle
@@ -70,7 +70,7 @@ if __name__ == "__main__":
             cv2.imshow('data', data[i])
 
             while True:
-                cmd = show3d.showpoints(showpoints, c0=c0, c1=c1, c2=c2, waittime=100, magnifyBlue=(0 if colorflag == 1 else 0),
+                cmd = show3d.showpoints(showpoints, c0=c0, c1=c1, c2=c2, waittime=100, magnify_blue=(0 if colorflag == 1 else 0),
                                         background=((128, 128, 128) if colorflag == 1 else (0, 0, 0)), ballradius=(2 if colorflag == 1 else 12)) % 256
                 if cmd == ord('c'):
                     colorflag = 1 - colorflag

@@ -5,7 +5,7 @@ import os
 import zlib
 import threading
 import queue
-import show3d
+from demo import show3d
 
 FETCH_BATCH_SIZE = 32
 BATCH_SIZE = 32
@@ -63,7 +63,7 @@ class BatchFetcher(threading.Thread):
         return data, ptcloud, validating
 
     def run(self):
-        while self.bno < 64 and not self.stopped:
+        while self.bno < 300000 and not self.stopped:
             self.queue.put(self.work(self.bno % 300000))
             self.bno += 1
 
