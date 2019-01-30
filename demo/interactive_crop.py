@@ -1,8 +1,9 @@
 import cv2
 import numpy as np
-runsingleimage=None
 import sys
-import show3d
+import depthestimate
+
+runsingleimage = None
 
 overlay=np.zeros((192,256,3),dtype='uint8')
 h,w=overlay.shape[:2]
@@ -146,7 +147,7 @@ while True:
 	cv2.imshow('image',show)
 	cv2.imshow('cropped',show_cropped)
 	if xyzs is not None:
-		cmd=show3d.showpoints(xyzs,waittime=10)%256
+		cmd=depthestimate.show3d.showpoints(xyzs,waittime=10)%256
 	else:
 		cmd=cv2.waitKey(10)%256
 	if cmd==ord('q'):

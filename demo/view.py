@@ -1,4 +1,4 @@
-import show3d
+from depthestimate import show3d
 import numpy as np
 import sys
 a=np.loadtxt(sys.argv[1])

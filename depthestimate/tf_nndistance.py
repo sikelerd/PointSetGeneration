@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow.python.framework import ops
 
-nn_distance_module = tf.load_op_library('depthestimate/tf_nndistance_so.so')
+nn_distance_module = tf.load_op_library('PointSetGeneration/depthestimate/tf_nndistance_so.so')
 
 
 def nn_distance(xyz1, xyz2):

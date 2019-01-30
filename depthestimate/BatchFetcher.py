@@ -1,11 +1,9 @@
 import numpy as np
-import cv2
 import math
 import os
 import zlib
 import threading
 import queue
-from demo import show3d
 
 FETCH_BATCH_SIZE = 32
 BATCH_SIZE = 32
@@ -60,10 +58,10 @@ class BatchFetcher(threading.Thread):
         data[:, :, :, :3] = color * (1 / 255.0)
         data[:, :, :, 3] = depth == 0
         validating = np.array([i[0] == 'f' for i in keynames], dtype='float32')
-        return data, ptcloud, validating
+        return color, ptcloud, validating
 
     def run(self):
-        while self.bno < 300000 and not self.stopped:
+        while self.bno < 64 and not self.stopped:
             self.queue.put(self.work(self.bno % 300000))
             self.bno += 1
 
@@ -76,24 +74,3 @@ class BatchFetcher(threading.Thread):
         self.stopped = True
         while not self.queue.empty():
             self.queue.get()
-
-
-if __name__ == '__main__':
-    dataname = "YTTRBtraindump_220k"
-    fetchworker = BatchFetcher(dataname)
-    fetchworker.bno = 0
-    fetchworker.start()
-    for cnt in range(100):
-        data, ptcloud, validating = fetchworker.fetch()
-        validating = validating[0] != 0
-        assert len(data) == FETCH_BATCH_SIZE
-        for i in range(len(data)):
-            cv2.imshow('data', data[i])
-            while True:
-                cmd = show3d.showpoints(ptcloud[i])
-                if cmd == ord(' '):
-                    break
-                elif cmd == ord('q'):
-                    break
-            if cmd == ord('q'):
-                break

@@ -1,10 +1,10 @@
 import tensorflow as tf
 import time
-import pickle
 import argparse
 import os
+import cv2
 from depthestimate.BatchFetcher import BATCH_SIZE, FETCH_BATCH_SIZE, HEIGHT, WIDTH, POINTCLOUDSIZE, OUTPUTPOINTS, BatchFetcher
-from depthestimate import network
+from depthestimate import network, show3d
 
 lastbatch = None
 lastconsumed = FETCH_BATCH_SIZE
@@ -24,9 +24,11 @@ def stop_fetcher():
     fetchworker.shutdown()
 
 
-def train_network(resourceid, keyname, datadir, dumpdir):
-    img_inp, x, pt_gt, loss, optimizer, batchno, batchnoinc, mindist, loss_nodecay, dists_forward, dists_backward, dist0 = \
-        network.build_graph(resourceid, HEIGHT, WIDTH, POINTCLOUDSIZE, OUTPUTPOINTS, 3e-5 * BATCH_SIZE / FETCH_BATCH_SIZE)
+def train_network(resourceid, keyname, dumpdir):
+    learning_rate = 3e-5 * BATCH_SIZE / FETCH_BATCH_SIZE
+    with tf.device('/gpu:%d' % resourceid):
+        img_inp, x, pt_gt, loss, optimizer, batchno, batchnoinc, mindist, loss_nodecay, dists_forward, dists_backward, dist0 = \
+            network.build_graph_training(HEIGHT, WIDTH, POINTCLOUDSIZE, OUTPUTPOINTS, learning_rate)
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     config.allow_soft_placement = True
@@ -34,21 +36,26 @@ def train_network(resourceid, keyname, datadir, dumpdir):
     with tf.Session(config=config) as sess, \
             open('%s/%s.log' % (dumpdir, keyname), 'a') as fout:
         merged = tf.summary.merge_all()
-        writer = tf.summary.FileWriter("dump", sess.graph)
+        writer = tf.summary.FileWriter(dumpdir, sess.graph)
         sess.run(tf.global_variables_initializer())
         trainloss_accs = [0, 0, 0]
         trainloss_acc0 = 1e-9
         validloss_accs = [0, 0, 0]
         validloss_acc0 = 1e-9
         lastsave = time.time()
-        bno = sess.run(batchno)
-        fetchworker.bno = bno // (FETCH_BATCH_SIZE / BATCH_SIZE)
+        epoch = 0
+        fetchworker.bno = 0 // (FETCH_BATCH_SIZE / BATCH_SIZE)
         fetchworker.start()
-        while bno < 300000:
+        data, ptcloud, validating = fetch_batch()
+        validating = validating[0] != 0
+        while epoch < 1:
+            epoch += 1
             t0 = time.time()
-            data, ptcloud, validating = fetch_batch()
             t1 = time.time()
-            validating = validating[0] != 0
+            print('image type', img_inp[0][0, 0, 0], type(data[0][0, 0, 0]))
+            print('point type', pt_gt[0][0, 0], type(ptcloud[0][0, 0]))
+            print('input image shape', data.shape)
+            print('input pt shape', ptcloud.shape)
             if not validating:
                 _, pred, total_loss, trainloss, trainloss1, trainloss2, distmap_0, summary = sess.run(
                     [optimizer, x, loss, loss_nodecay, dists_forward, dists_backward, dist0, merged],
@@ -57,7 +64,7 @@ def train_network(resourceid, keyname, datadir, dumpdir):
                 trainloss_accs[1] = trainloss_accs[1] * 0.99 + trainloss1
                 trainloss_accs[2] = trainloss_accs[2] * 0.99 + trainloss2
                 trainloss_acc0 = trainloss_acc0 * 0.99 + 1
-                writer.add_summary(summary, bno)
+                writer.add_summary(summary, epoch)
             else:
                 _, pred, total_loss, validloss, validloss1, validloss2, distmap_0 = sess.run([batchnoinc, x, loss, loss_nodecay, dists_forward, dists_backward, dist0],
                                                                                              feed_dict={img_inp: data, pt_gt: ptcloud})
@@ -67,7 +74,6 @@ def train_network(resourceid, keyname, datadir, dumpdir):
                 validloss_acc0 = validloss_acc0 * 0.997 + 1
             t2 = time.time()
 
-            bno = sess.run(batchno)
             if not validating:
                 showloss = trainloss
                 showloss1 = trainloss1
@@ -76,48 +82,40 @@ def train_network(resourceid, keyname, datadir, dumpdir):
                 showloss = validloss
                 showloss1 = validloss1
                 showloss2 = validloss2
-            print(bno, trainloss_accs[0] / trainloss_acc0, trainloss_accs[1] / trainloss_acc0, trainloss_accs[2] / trainloss_acc0, showloss, showloss1, showloss2,
+            print(epoch, trainloss_accs[0] / trainloss_acc0, trainloss_accs[1] / trainloss_acc0, trainloss_accs[2] / trainloss_acc0, showloss, showloss1, showloss2,
                   validloss_accs[0] / validloss_acc0, validloss_accs[1] / validloss_acc0, validloss_accs[2] / validloss_acc0, total_loss - showloss, file=fout)
-            if bno % 128 == 0:
+            if epoch % 100 == 0:
                 fout.flush()
             if time.time() - lastsave > 900:
                 saver.save(sess, '%s/' % dumpdir + keyname + ".ckpt")
                 lastsave = time.time()
-            print(bno, 't', trainloss_accs[0] / trainloss_acc0, trainloss_accs[1] / trainloss_acc0, trainloss_accs[2] / trainloss_acc0, 'v', validloss_accs[0] / validloss_acc0,
+            print(epoch, 't', trainloss_accs[0] / trainloss_acc0, trainloss_accs[1] / trainloss_acc0, trainloss_accs[2] / trainloss_acc0, 'v', validloss_accs[0] / validloss_acc0,
                   validloss_accs[1] / validloss_acc0, validloss_accs[2] / validloss_acc0, total_loss - showloss, t1 - t0, t2 - t1, time.time() - t0, fetchworker.queue.qsize())
         saver.save(sess, '%s/' % dumpdir + keyname + ".ckpt")
         writer.close()
 
 
-def dumppredictions(resourceid, keyname, dumpdir, valnum):
-    img_inp, x, pt_gt, loss, optimizer, batchno, batchnoinc, mindist, loss_nodecay, dists_forward, dists_backward, dist0 = \
-        network.build_graph(resourceid, HEIGHT, WIDTH, POINTCLOUDSIZE, OUTPUTPOINTS, 3e-5 * BATCH_SIZE / FETCH_BATCH_SIZE)
-    config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True
-    config.allow_soft_placement = True
-    saver = tf.train.Saver()
-    fout = open("%s/%s.v.pkl" % (dumpdir, keyname), 'wb')
-    with tf.Session(config=config) as sess:
-        # sess.run(tf.initialize_all_variables())
-        sess.run(tf.global_variables_initializer())
-        saver.restore(sess, "%s/%s.ckpt" % (dumpdir, keyname))
-        fetchworker.bno = 0
-        fetchworker.start()
-        cnt = 0
-        for i in range(0, 63000):
-            t0 = time.time()
-            data, ptcloud, validating = fetch_batch()
-            validating = validating[0] != 0
-            if not validating:
-                continue
-            cnt += 1
-            pred, distmap = sess.run([x, mindist], feed_dict={img_inp: data, pt_gt: ptcloud})
-            pickle.dump((i, data, ptcloud, pred, distmap), fout, protocol=-1)
+def load_model(resourceid, weightsfile):
+    with tf.device('/gpu:%d' % resourceid):
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        config.allow_soft_placement = True
+        sess = tf.Session(config=config)
+        saver = tf.train.import_meta_graph(weightsfile + 'train_nn.ckpt.meta')
+        saver.restore(sess, tf.train.latest_checkpoint(weightsfile))
+        graph = tf.get_default_graph()
+        img_inp = graph.get_tensor_by_name("img_inp:0")
+        print(img_inp)
+        x = graph.get_tensor_by_name("result:0")
+        return sess, img_inp, x
 
-            i, 'time', time.time() - t0, cnt
-            if cnt >= valnum:
-                break
-    fout.close()
+
+def run_image(model, img_in):
+    sess, img_inp, x = model
+    img_in = img_in.astype('float32') / 255
+
+    (ret,), = sess.run([x], feed_dict={img_inp: img_in[None, :, :, :]})
+    return ret
 
 
 def train(args):
@@ -125,16 +123,21 @@ def train(args):
         os.mkdir(args.dump)
 
     keyname = os.path.basename(__file__).rstrip('.py')
-    train_network(args.resourceid, keyname, args.data, args.dump)
+    train_network(args.resourceid, keyname, args.dump)
 
 
 def predict(args):
-    keyname = os.path.basename(__file__).rstrip('.py')
-    dumppredictions(args.resourceid, keyname, args.dump, args.valnum)
+    model = load_model(args.resourceid, args.dump + '/')
+    img_in = cv2.imread(args.image)
+    fout = open(args.image + '.txt', 'w')
+    ret = run_image(model, img_in)
+    for x, y, z in ret:
+        print(x, y, z, file=fout)
+    show3d.showpoints(ret)
 
 
 if __name__ == '__main__':
-    argparser = argparse.ArgumentParser(description='Preprocess data')
+    argparser = argparse.ArgumentParser(description='Train or evaluate the network')
     subparser = argparser.add_subparsers()
     argparser.add_argument(
         '-data',
@@ -157,10 +160,9 @@ if __name__ == '__main__':
 
     predict_parser = subparser.add_parser('predict')
     predict_parser.add_argument(
-        '-num', '--valnum',
-        metavar='valnum',
-        default=3,
-        help='the index of the file to use vor validation (Default 3)')
+        'image',
+        metavar='img',
+        help='the image filt to predict')
     predict_parser.set_defaults(func=predict)
 
     argsuments = argparser.parse_args()

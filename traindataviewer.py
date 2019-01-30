@@ -58,7 +58,7 @@ if __name__ == '__main__':
 
 
     import sys
-    from demo import show3d
+    from depthestimate import show3d
 
     if len(sys.argv) < 2:
         print('python traindataviewer.py data/0/0.gz')
