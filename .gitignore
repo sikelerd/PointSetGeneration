@@ -2,3 +2,4 @@ demo/*.txt
 *.pyc
 *.so
 *.o
+.idea/
