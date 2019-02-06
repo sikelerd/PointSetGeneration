@@ -119,7 +119,7 @@ def build_graph(img_height, img_width, outputpoints):
     x = tflearn.layers.conv.conv_2d(x, 64, (3, 3), strides=1, activation='relu', weight_decay=1e-5, regularizer='L2')
     x = tflearn.layers.conv.conv_2d(x, 64, (3, 3), strides=1, activation='relu', weight_decay=1e-5, regularizer='L2')
 
-    x_additional = tflearn.layers.core.fully_connected(x_additional, 1024, activation='relu', weight_decay=1e-3, regularizer='L2')
+    x_additional = tflearn.layers.core.fully_connected(x_additional, outputpoints, activation='relu', weight_decay=1e-3, regularizer='L2')
     x_additional = tflearn.layers.core.fully_connected(x_additional, 256 * 3, activation='linear', weight_decay=1e-3, regularizer='L2')
     x_additional = tf.reshape(x_additional, (batch, 256, 3))
     x = tflearn.layers.conv.conv_2d(x, 3, (3, 3), strides=1, activation='linear', weight_decay=1e-5, regularizer='L2')
@@ -129,18 +129,15 @@ def build_graph(img_height, img_width, outputpoints):
     return img_inp, x
 
 
-def build_graph_training(img_height, img_width, pointcloudsize, outputpoints, learning_rate):
+def build_graph_training(img_height, img_width, outputpoints, learning_rate):
     img_inp, x = build_graph(img_height, img_width, outputpoints)
-    pt_gt = tf.placeholder(tf.float32, shape=(None, pointcloudsize, 3), name='pt_gt')
+    pt_gt = tf.placeholder(tf.float32, shape=(None, None, 3), name='pt_gt')
     dists_forward, _, dists_backward, _ = tf_nndistance.nn_distance(pt_gt, x)
     mindist = dists_forward
-    dist0 = mindist[0, :]
     dists_forward = tf.reduce_mean(dists_forward)
     dists_backward = tf.reduce_mean(dists_backward)
     loss_nodecay = (dists_forward + dists_backward / 2.0) * 10000
     loss = loss_nodecay + tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)) * 0.1
     tf.summary.scalar('loss', loss)
-    batchno = tf.Variable(0, dtype=tf.int32)
-    optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss, global_step=batchno)
-    batchnoinc = batchno.assign(batchno + 1)
-    return img_inp, x, pt_gt, loss, optimizer, batchno, batchnoinc, mindist, loss_nodecay, dists_forward, dists_backward, dist0
+    optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)
+    return img_inp, x, pt_gt, loss, optimizer, mindist, loss_nodecay, dists_forward, dists_backward
