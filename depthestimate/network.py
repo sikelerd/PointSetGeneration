@@ -9,6 +9,8 @@ def build_graph(img_height, img_width, outputpoints):
     batch = tf.shape(img_inp)[0]
 
     x = img_inp
+    # 240 320
+    x = tf.image.resize_images(x, (192, 256))
     # 192 256
     x = tflearn.layers.conv.conv_2d(x, 16, (3, 3), strides=1, activation='relu', weight_decay=1e-5, regularizer='L2')
     x = tflearn.layers.conv.conv_2d(x, 16, (3, 3), strides=1, activation='relu', weight_decay=1e-5, regularizer='L2')
