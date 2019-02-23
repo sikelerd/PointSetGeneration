@@ -3,3 +3,6 @@ demo/*.txt
 *.so
 *.o
 .idea/
+*.png
+*.ply
+dump/
