@@ -27,7 +27,7 @@ def stop_fetcher():
 def train_network(resourceid, keyname, dumpdir):
     learning_rate = 3e-5 * BATCH_SIZE / FETCH_BATCH_SIZE
     with tf.device('/gpu:%d' % resourceid):
-        img_inp, x, pt_gt, loss, optimizer, batchno, batchnoinc, mindist, loss_nodecay, dists_forward, dists_backward, dist0 = \
+        img_inp, x, pt_gt, loss, optimizer, mindist, loss_nodecay, dists_forward, dists_backward = \
             network.build_graph_training(HEIGHT, WIDTH, POINTCLOUDSIZE, OUTPUTPOINTS, learning_rate)
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
@@ -57,8 +57,8 @@ def train_network(resourceid, keyname, dumpdir):
             print('input image shape', data.shape)
             print('input pt shape', ptcloud.shape)
             if not validating:
-                _, pred, total_loss, trainloss, trainloss1, trainloss2, distmap_0, summary = sess.run(
-                    [optimizer, x, loss, loss_nodecay, dists_forward, dists_backward, dist0, merged],
+                _, pred, total_loss, trainloss, trainloss1, trainloss2, summary = sess.run(
+                    [optimizer, x, loss, loss_nodecay, dists_forward, dists_backward, merged],
                     feed_dict={img_inp: data, pt_gt: ptcloud})
                 trainloss_accs[0] = trainloss_accs[0] * 0.99 + trainloss
                 trainloss_accs[1] = trainloss_accs[1] * 0.99 + trainloss1
@@ -66,7 +66,7 @@ def train_network(resourceid, keyname, dumpdir):
                 trainloss_acc0 = trainloss_acc0 * 0.99 + 1
                 writer.add_summary(summary, epoch)
             else:
-                _, pred, total_loss, validloss, validloss1, validloss2, distmap_0 = sess.run([batchnoinc, x, loss, loss_nodecay, dists_forward, dists_backward, dist0],
+                pred, total_loss, validloss, validloss1, validloss2 = sess.run([x, loss, loss_nodecay, dists_forward, dists_backward],
                                                                                              feed_dict={img_inp: data, pt_gt: ptcloud})
                 validloss_accs[0] = validloss_accs[0] * 0.997 + validloss
                 validloss_accs[1] = validloss_accs[1] * 0.997 + validloss1

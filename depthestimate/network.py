@@ -138,8 +138,10 @@ def build_graph_training(img_height, img_width, outputpoints, learning_rate):
     mindist = dists_forward
     dists_forward = tf.reduce_mean(dists_forward)
     dists_backward = tf.reduce_mean(dists_backward)
-    loss_nodecay = (dists_forward + dists_backward / 2.0) * 10000
+    loss_nodecay = (dists_forward + dists_backward / 2.0)
     loss = loss_nodecay + tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)) * 0.1
+    tf.summary.scalar('distance_forward', dists_forward)
+    tf.summary.scalar('distance_backward', dists_backward)
     tf.summary.scalar('loss', loss)
-    optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)
+    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss)
     return img_inp, x, pt_gt, loss, optimizer, mindist, loss_nodecay, dists_forward, dists_backward
