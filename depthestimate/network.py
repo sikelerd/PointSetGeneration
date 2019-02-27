@@ -3,9 +3,8 @@ import tensorflow as tf
 from . import tf_nndistance
 
 
-def build_graph(img_height, img_width, outputpoints):
+def build_graph(img_inp, outputpoints):
     tflearn.init_graph(seed=1029, num_cores=2, gpu_memory_fraction=0.9, soft_placement=True)
-    img_inp = tf.placeholder(tf.float32, shape=(None, img_height, img_width, 3), name='img_inp')
     batch = tf.shape(img_inp)[0]
 
     x = img_inp
@@ -127,14 +126,13 @@ def build_graph(img_height, img_width, outputpoints):
     x = tflearn.layers.conv.conv_2d(x, 3, (3, 3), strides=1, activation='linear', weight_decay=1e-5, regularizer='L2')
     x = tf.reshape(x, (batch, 32 * 24, 3))
     x = tf.concat([x_additional, x], 1)
-    x = tf.reshape(x, (batch, outputpoints, 3), name="result")
-    return img_inp, x
+    x = tf.reshape(x, (batch, outputpoints, 3), name='result')
+    return x
 
 
-def build_graph_training(img_height, img_width, outputpoints, learning_rate):
-    img_inp, x = build_graph(img_height, img_width, outputpoints)
-    pt_gt = tf.placeholder(tf.float32, shape=(None, None, 3), name='pt_gt')
-    dists_forward, _, dists_backward, _ = tf_nndistance.nn_distance(pt_gt, x)
+def build_graph_training(img_inp, pc_gt, outputpoints):
+    x = build_graph(img_inp, outputpoints)
+    dists_forward, _, dists_backward, _ = tf_nndistance.nn_distance(pc_gt, x)
     mindist = dists_forward
     dists_forward = tf.reduce_mean(dists_forward)
     dists_backward = tf.reduce_mean(dists_backward)
@@ -142,6 +140,5 @@ def build_graph_training(img_height, img_width, outputpoints, learning_rate):
     loss = loss_nodecay + tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)) * 0.1
     tf.summary.scalar('distance_forward', dists_forward)
     tf.summary.scalar('distance_backward', dists_backward)
-    tf.summary.scalar('loss', loss)
-    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss)
-    return img_inp, x, pt_gt, loss, optimizer, mindist, loss_nodecay, dists_forward, dists_backward
+    tf.summary.scalar('pc_loss', loss_nodecay)
+    return x, loss, mindist, loss_nodecay, dists_forward, dists_backward
