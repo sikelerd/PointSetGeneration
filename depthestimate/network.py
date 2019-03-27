@@ -3,9 +3,13 @@ import tensorflow as tf
 from . import tf_nndistance
 
 
-def build_graph(img_inp):
+def build_graph(img_inp, factor=1, smooth_part=3, distributed_part=1):
     tflearn.init_graph(seed=1029, num_cores=2, gpu_memory_fraction=0.9, soft_placement=True)
     batch = tf.shape(img_inp)[0]
+    orig_size = 1024
+    part_size = int(factor*orig_size/(smooth_part + distributed_part))
+    smooth_points = part_size*smooth_part
+    distributed_points = part_size*distributed_part
 
     with tf.variable_scope('points'):
         x = img_inp
@@ -43,7 +47,7 @@ def build_graph(img_inp):
         x5 = x
         x = tflearn.layers.conv.conv_2d(x, 512, (5, 5), strides=2, activation='relu', weight_decay=1e-5, regularizer='L2')
         # 3 4
-        x_additional = tflearn.layers.core.fully_connected(x, 2048, activation='relu', weight_decay=1e-3, regularizer='L2')
+        x_additional = tflearn.layers.core.fully_connected(x, factor*2048, activation='relu', weight_decay=1e-3, regularizer='L2')
         x = tflearn.layers.conv.conv_2d_transpose(x, 256, [5, 5], [6, 8], strides=2, activation='linear', weight_decay=1e-5, regularizer='L2')
         # 6 8
         x5 = tflearn.layers.conv.conv_2d(x5, 256, (3, 3), strides=1, activation='linear', weight_decay=1e-5, regularizer='L2')
@@ -99,8 +103,8 @@ def build_graph(img_inp):
         x5 = x
         x = tflearn.layers.conv.conv_2d(x, 512, (5, 5), strides=2, activation='relu', weight_decay=1e-5, regularizer='L2')
         # 3 4
-        x_additional = tflearn.layers.core.fully_connected(x_additional, 2048, activation='linear', weight_decay=1e-4, regularizer='L2')
-        x_additional = tf.nn.relu(tf.add(x_additional, tflearn.layers.core.fully_connected(x, 2048, activation='linear', weight_decay=1e-3, regularizer='L2'), name="add10"),
+        x_additional = tflearn.layers.core.fully_connected(x_additional, factor*2048, activation='linear', weight_decay=1e-4, regularizer='L2')
+        x_additional = tf.nn.relu(tf.add(x_additional, tflearn.layers.core.fully_connected(x, factor*2048, activation='linear', weight_decay=1e-3, regularizer='L2'), name="add10"),
                                   name="relu10")
         x = tflearn.layers.conv.conv_2d_transpose(x, 256, [5, 5], [6, 8], strides=2, activation='linear', weight_decay=1e-5, regularizer='L2')
         # 6 8
@@ -121,18 +125,20 @@ def build_graph(img_inp):
         x = tflearn.layers.conv.conv_2d(x, 64, (3, 3), strides=1, activation='relu', weight_decay=1e-5, regularizer='L2')
         x = tflearn.layers.conv.conv_2d(x, 64, (3, 3), strides=1, activation='relu', weight_decay=1e-5, regularizer='L2')
 
-        x_additional = tflearn.layers.core.fully_connected(x_additional, 1024, activation='relu', weight_decay=1e-3, regularizer='L2')
-        x_additional = tflearn.layers.core.fully_connected(x_additional, 256 * 3, activation='linear', weight_decay=1e-3, regularizer='L2')
-        x_additional = tf.reshape(x_additional, (batch, 256, 3))
+        x_additional = tflearn.layers.core.fully_connected(x_additional, factor * 1024, activation='relu', weight_decay=1e-3, regularizer='L2')
+        x_additional = tflearn.layers.core.fully_connected(x_additional, distributed_points, activation='linear', weight_decay=1e-3, regularizer='L2')
+        x_additional = tf.reshape(x_additional, (batch, distributed_points, 3))
         x = tflearn.layers.conv.conv_2d(x, 3, (3, 3), strides=1, activation='linear', weight_decay=1e-5, regularizer='L2')
-        x = tf.reshape(x, (batch, 1024 - 256, 3))
+        x = tf.reshape(x, (batch, smooth_points, 3))
+        print(x)
+        print(x_additional)
         x = tf.concat([x_additional, x], 1)
-        x = tf.reshape(x, (batch, 1024, 3), name='points')
+        x = tf.reshape(x, (batch, factor * 1024, 3), name='points')
     return x
 
 
-def build_graph_training(img_inp, pc_gt):
-    x = build_graph(img_inp)
+def build_graph_training(img_inp, pc_gt, factor=1, smooth_part=3, distributed_part=1):
+    x = build_graph(img_inp, factor, smooth_part, distributed_part)
     dists_forward, _, dists_backward, _ = tf_nndistance.nn_distance(pc_gt, x)
     mindist = dists_forward
     dists_forward = tf.reduce_mean(dists_forward)
