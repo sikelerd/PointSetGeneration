@@ -135,11 +135,13 @@ def build_graph(img_inp, factor=1):
 def build_graph_training(img_inp, pc_gt, factor=1):
     x = build_graph(img_inp, factor)
     dists_forward, _, dists_backward, _ = tf_nndistance.nn_distance(pc_gt, x)
-    mindist = dists_forward
+    # dists_forward = dists_forward * tf.norm(pc_gt, axis=2)
+    mindist_forward = dists_forward
+    mindist_backword = dists_backward
     dists_forward = tf.reduce_mean(dists_forward)
     dists_backward = tf.reduce_mean(dists_backward)
     loss_nodecay = (dists_forward + dists_backward / 2.0)
     tf.summary.scalar('distance_from_gt_to_pred (forward)', dists_forward)
     tf.summary.scalar('distance_from_pred_to_gt (backward)', dists_backward)
     tf.summary.scalar('pc_loss', loss_nodecay)
-    return x, mindist, loss_nodecay, dists_forward, dists_backward
+    return x, mindist_forward, mindist_backword, loss_nodecay, dists_forward, dists_backward
