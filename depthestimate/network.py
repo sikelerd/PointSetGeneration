@@ -126,12 +126,10 @@ def build_graph(img_inp, factor=1, smooth_part=3, distributed_part=1):
         x = tflearn.layers.conv.conv_2d(x, 64, (3, 3), strides=1, activation='relu', weight_decay=1e-5, regularizer='L2')
 
         x_additional = tflearn.layers.core.fully_connected(x_additional, factor * 1024, activation='relu', weight_decay=1e-3, regularizer='L2')
-        x_additional = tflearn.layers.core.fully_connected(x_additional, distributed_points, activation='linear', weight_decay=1e-3, regularizer='L2')
+        x_additional = tflearn.layers.core.fully_connected(x_additional, distributed_points * 3, activation='linear', weight_decay=1e-3, regularizer='L2')
         x_additional = tf.reshape(x_additional, (batch, distributed_points, 3))
         x = tflearn.layers.conv.conv_2d(x, 3, (3, 3), strides=1, activation='linear', weight_decay=1e-5, regularizer='L2')
         x = tf.reshape(x, (batch, smooth_points, 3))
-        print(x)
-        print(x_additional)
         x = tf.concat([x_additional, x], 1)
         x = tf.reshape(x, (batch, factor * 1024, 3), name='points')
     return x
