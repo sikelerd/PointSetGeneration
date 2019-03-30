@@ -8,7 +8,7 @@ def build_graph(img_inp, factor=1):
     batch = tf.shape(img_inp)[0]
     distributed_points = factor * 256
 
-    with tf.variable_scope('points'):
+    with tf.variable_scope('points', reuse=tf.AUTO_REUSE):
         x = img_inp
         # 240 320
         x = tf.image.resize_images(x, (192, 256))
