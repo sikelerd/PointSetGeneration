@@ -12,15 +12,15 @@ class MappingNetwork:
         }
         if training:
             self._placeholders['pc_gt'] = tf.placeholder(tf.float32, shape=(None, 8000, 3), name='pt_gt')
-        self.distributed_points = int(256 * 3 / 2)
-        self.smoothed_points = int(768 * 3 / 2)
+        self.distributed_points = 256
+        self.smoothed_points = 768
         self.num_points = self.smoothed_points + self.distributed_points
-        print(self.distributed_points, self. smoothed_points, self.num_points)
         self.factor = factor
+        self.all_points = self.num_points * self.factor
 
         p_start = np.pi / 4
         p_end = np.pi * 3 / 4
-        p_channels = 96
+        p_channels = 128
         p = np.linspace(p_start, p_end, p_channels)
 
         t_start = -0.4677
@@ -28,10 +28,9 @@ class MappingNetwork:
         t_channels = 64
         t = np.linspace(t_start, t_end, t_channels)
 
-        x_koor = np.tile(np.sin(p), 64)
-        y_koor = np.tile(np.cos(p), 64)
-        z_koor = np.repeat(1 - np.cos(t), 96)
-        self.koordinates = np.transpose(np.array([x_koor, y_koor, z_koor]), (1, 0))
+        x_koor = np.tile(np.sin(p), int(self.all_points / p_channels))
+        y_koor = np.tile(np.cos(p), int(self.all_points / p_channels))
+        self.koordinates = np.transpose(np.array([x_koor, y_koor]), (1, 0))
 
     @property
     def placeholders(self):
@@ -159,22 +158,26 @@ class MappingNetwork:
                 x = tflearn.layers.conv.conv_2d(x, 64, (3, 3), strides=1, activation='relu', weight_decay=1e-5, regularizer='L2')
 
                 x_additional = tflearn.layers.core.fully_connected(x_additional, 1024, activation='relu', weight_decay=1e-3, regularizer='L2')
-                x_additional = tflearn.layers.core.fully_connected(x_additional, 256 * 3, activation='linear', weight_decay=1e-3, regularizer='L2')
-                x_additional = tf.reshape(x_additional, (batch_size, self.distributed_points, 2))
+                x_additional = tflearn.layers.core.fully_connected(x_additional, self.distributed_points * 3, activation='linear', weight_decay=1e-3, regularizer='L2')
+                x_additional = tf.reshape(x_additional, (batch_size, self.distributed_points, 3))
                 x = tflearn.layers.conv.conv_2d(x, 3, (3, 3), strides=1, activation='linear', weight_decay=1e-5, regularizer='L2')
-                x = tf.reshape(x, (batch_size, self.smoothed_points, 2))
+                x = tf.reshape(x, (batch_size, self.smoothed_points, 3))
                 x = tf.concat([x_additional, x], 1)
-                x = tf.reshape(x, (batch_size, self.num_points, 2), name='points')
+                x = tf.reshape(x, (batch_size, self.num_points, 3), name='points')
                 points.append(x)
 
             p = tf.concat(points, axis=1)
-            koor = tf.constant(self.koordinates, dtype=tf.float32)
 
-            r = tf.reshape(p[:, :, 0], (-1, self.num_points * self.factor, 1))
-            h = tf.reshape(p[:, :, 1], (-1, self.num_points * self.factor, 1))
-            i = tf.concat([r, r, h], 2)
+            xy_koor = tf.constant(self.koordinates, dtype=tf.float32)
+            r = tf.reshape(p[:, :, 0], (-1, self.all_points, 1))
+            i = tf.concat([r, r], 2)
+            xy_koor = tf.multiply(xy_koor, i, name='points')
 
-            koor = tf.multiply(koor, i, name='points')
+            h = tf.reshape(p[:, :, 1], (-1, self.all_points, 1))
+            omega = 1 - tf.cos(tf.reshape(p[:, :, 1], (-1, self.all_points, 1)))
+            z_koor = tf.multiply(h, omega)
+
+            koor = tf.concat([xy_koor, z_koor], axis=2)
         return koor
 
     def build_training_net(self, image_current, pc_gt):
