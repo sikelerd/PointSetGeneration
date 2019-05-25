@@ -184,6 +184,7 @@ class MappingNetwork:
         x = self.build_net(image_current)
         dists_forward, idx_forward, dists_backward, idx_backward = tf_nndistance.nn_distance(pc_gt, x)
         dists_forward = dists_forward * tf.norm(pc_gt, axis=2)
+        dists_backward = dists_backward * tf.norm(x, axis=2)
         mindist_forward = dists_forward
         mindist_backword = dists_backward
         dists_forward = tf.reduce_mean(dists_forward)
