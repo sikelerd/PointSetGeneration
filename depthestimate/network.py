@@ -175,7 +175,7 @@ class MappingNetwork:
             xy_koor = tf.multiply(xy_koor, i, name='points')
 
             h = tf.reshape(p[:, :, 1], (-1, self.all_points, 1))
-            omega = 1 - tf.cos(tf.reshape(p[:, :, 1], (-1, self.all_points, 1)))
+            omega = 1 - tf.cos(tf.reshape(p[:, :, 2], (-1, self.all_points, 1)))
             z_koor = tf.multiply(h, omega)
 
             koor = tf.concat([xy_koor, z_koor], axis=2)
