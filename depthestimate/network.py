@@ -23,10 +23,12 @@ class MappingNetwork:
         p_channels = 128
         p = np.linspace(p_start, p_end, p_channels)
 
-        t_start = -0.4677
-        t_end = 0.4677
+        t_start = 0.0
+        t_end = 2*0.4677
         t_channels = 64
         t = np.linspace(t_start, t_end, t_channels)
+        t = 1 - np.cos(t)
+        self.elevation = np.repeat(t, int(self.all_points / t_channels))
 
         x_koor = np.tile(np.sin(p), int(self.all_points / p_channels))
         y_koor = np.tile(np.cos(p), int(self.all_points / p_channels))
@@ -175,7 +177,7 @@ class MappingNetwork:
             xy_koor = tf.multiply(xy_koor, i, name='points')
 
             h = tf.reshape(p[:, :, 1], (-1, self.all_points, 1))
-            omega = 1 - tf.cos(tf.reshape(p[:, :, 2], (-1, self.all_points, 1)))
+            omega = tf.expand_dims(tf.constant(self.elevation, dtype=tf.float32), 1)
             z_koor = tf.multiply(h, omega)
 
             koor = tf.concat([xy_koor, z_koor], axis=2)
