@@ -150,8 +150,8 @@ class MappingNetwork:
                     x = tf.concat([x_additional, x], 1)
                     x = tf.reshape(x, (batch_size, self.num_points, 3), name='points')
                     points.append(x)
-
-        return points
+            p = tf.concat(points, axis=1)
+        return p
 
     def build_training_net(self, image_current, pc_gt):
         x = self.build_net(image_current)
