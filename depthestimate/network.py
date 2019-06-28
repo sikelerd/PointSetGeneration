@@ -5,12 +5,12 @@ from . import tf_nndistance
 
 class MappingNetwork:
 
-    def __init__(self, factor=1, training=False):
+    def __init__(self, factor=1, batch_size=1, training=False):
         self._placeholders = {
-            'image_current': tf.placeholder(tf.float32, shape=(None, 240, 320, 3), name='image_current'),
+            'image_current': tf.placeholder(tf.float32, shape=(batch_size, 240, 320, 3), name='image_current'),
         }
         if training:
-            self._placeholders['pc_gt'] = tf.placeholder(tf.float32, shape=(None, 8000, 3), name='pt_gt')
+            self._placeholders['pc_gt'] = tf.placeholder(tf.float32, shape=(batch_size, 8000, 3), name='pt_gt')
         self.distributed_points = 256
         self.smoothed_points = 768
         self.num_points = self.smoothed_points + self.distributed_points
