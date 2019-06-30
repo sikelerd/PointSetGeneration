@@ -1,5 +1,6 @@
 import tflearn
 import tensorflow as tf
+from tensorflow.python.framework import function
 from . import tf_nndistance
 
 
@@ -158,13 +159,20 @@ class MappingNetwork:
         dists_forward, idx_forward, dists_backward, idx_backward = tf_nndistance.nn_distance(pc_gt, x)
         dists_forward = dists_forward * tf.norm(pc_gt, axis=2)
         dists_backward = dists_backward
+
+        @function.Defun(tf.int32)
+        def unique(z):
+            return tf.size(tf.unique(z)[0])
+
+        unique_forward = tf.reduce_mean(tf.to_float(tf.constant(8000) - tf.map_fn(unique, tf.reshape(idx_forward, (-1, 8000)))))
+        unique_backward = tf.reduce_mean(tf.to_float(tf.constant(self.num_points * self.factor) - tf.map_fn(unique, tf.reshape(idx_backward, (-1, self.num_points * self.factor)))))
         mindist_forward = dists_forward
         mindist_backword = dists_backward
         dists_forward = tf.reduce_mean(dists_forward)
         dists_backward = tf.reduce_mean(dists_backward)
 
-        loss_nodecay = (dists_forward + dists_backward / 2.0)
+        loss_nodecay = (dists_forward + dists_backward / 2.0) + unique_forward + unique_backward
         tf.summary.scalar('distance_from_gt_to_pred (forward)', dists_forward)
         tf.summary.scalar('distance_from_pred_to_gt (backward)', dists_backward)
         tf.summary.scalar('pc_loss', loss_nodecay)
-        return x, mindist_forward, mindist_backword, loss_nodecay, dists_forward, dists_backward
+        return x, mindist_forward, mindist_backword, loss_nodecay, dists_forward, dists_backward, unique_forward, unique_backward
