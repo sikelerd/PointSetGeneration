@@ -164,8 +164,9 @@ class MappingNetwork:
         def unique(z):
             return tf.size(tf.unique(z)[0])
 
-        unique_forward = tf.reduce_mean(tf.to_float(tf.constant(8000) - tf.map_fn(unique, tf.reshape(idx_forward, (-1, 8000)))))
-        unique_backward = tf.reduce_mean(tf.to_float(tf.constant(self.num_points * self.factor) - tf.map_fn(unique, tf.reshape(idx_backward, (-1, self.num_points * self.factor)))))
+        num_points = tf.constant(self.num_points * self.factor)
+        unique_forward = tf.reduce_mean(tf.to_float(num_points - tf.map_fn(unique, tf.reshape(idx_forward, (-1, 8000)))))
+        unique_backward = tf.reduce_mean(tf.to_float(num_points - tf.map_fn(unique, tf.reshape(idx_backward, (-1, self.num_points * self.factor)))))
         mindist_forward = dists_forward
         mindist_backword = dists_backward
         dists_forward = tf.reduce_mean(dists_forward)
